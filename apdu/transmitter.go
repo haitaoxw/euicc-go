@@ -2,6 +2,7 @@ package apdu
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -107,8 +108,7 @@ func (t *Transmitter) readCommandResponse(w io.Writer, le byte) error {
 }
 
 func (t *Transmitter) Close() error {
-	if err := t.channel.CloseLogicalChannel(t.logicalChannel); err != nil {
-		return err
-	}
-	return t.channel.Disconnect()
+	closeErr := t.channel.CloseLogicalChannel(t.logicalChannel)
+	disconnectErr := t.channel.Disconnect()
+	return errors.Join(closeErr, disconnectErr)
 }
