@@ -38,8 +38,9 @@ func TestReadSkipsNonMatchingResponses(t *testing.T) {
 			messageType:   protocol.QMIMessageTypeIndication,
 			tlvs:          protocol.TLVs{{Type: 0x13, Len: 4, Value: []byte{0x01, 0x00, 0x00, 0x00}}},
 		}))
-		_, _ = server.Write(encodeResponse(t, protocol.QMIServiceControl, 0, 42, protocol.QMICtlCmdReleaseClientID, 0xAA))
+		_, _ = server.Write(encodeResponse(t, protocol.QMIServiceUIM, 8, 42, protocol.QMIUIMSendAPDU, 0xAA))
 		_, _ = server.Write(encodeResponse(t, protocol.QMIServiceUIM, 7, 41, protocol.QMIUIMSendAPDU, 0xAA))
+		_, _ = server.Write(encodeResponse(t, protocol.QMIServiceUIM, 7, 42, protocol.QMIUIMCloseLogicalChannel, 0xAA))
 		_, _ = server.Write(encodeResponse(t, protocol.QMIServiceUIM, 7, 42, protocol.QMIUIMSendAPDU, 0xBB))
 	}()
 

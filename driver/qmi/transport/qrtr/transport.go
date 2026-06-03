@@ -87,7 +87,8 @@ func (t *Transport) Read(c Conn, r *protocol.Request) (n int, err error) {
 			return 0, err
 		}
 		if response.MessageType != protocol.QMIMessageTypeResponse ||
-			response.TransactionID != r.TransactionID {
+			response.TransactionID != r.TransactionID ||
+			response.MessageID != r.MessageID {
 			continue
 		}
 		if err := response.Value.Error(); err != nil {
