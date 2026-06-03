@@ -25,6 +25,9 @@ func (t *TLV) Error() error {
 
 type TLVs []TLV
 
+// ErrNoResultTLV identifies QMI packets that do not carry a result TLV.
+var ErrNoResultTLV = errors.New("no result TLV found")
+
 func (ts *TLVs) ReadFrom(r io.Reader) (int64, error) {
 	var read int64
 	for {
@@ -92,7 +95,7 @@ func (ts TLVs) Find(t uint8) (TLV, bool) {
 func (ts TLVs) Error() error {
 	tlv, ok := ts.Find(0x02)
 	if !ok {
-		return errors.New("no result TLV found")
+		return ErrNoResultTLV
 	}
 	return tlv.Error()
 }

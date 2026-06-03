@@ -89,7 +89,11 @@ func (q *QMI) releaseClientID() error {
 		TransactionID: uint16(atomic.AddUint32(&q.TxnID, 1)),
 		ServiceType:   protocol.QMIServiceUIM,
 	}
-	return q.Transport.Transmit(request.Request())
+	wireRequest := request.Request()
+	if transport, ok := q.Transport.(protocol.CleanupTransport); ok {
+		return transport.TransmitCleanup(wireRequest)
+	}
+	return q.Transport.Transmit(wireRequest)
 }
 
 // Disconnect releases the client ID and closes the connection

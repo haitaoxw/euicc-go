@@ -1,6 +1,12 @@
 package protocol
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+// ErrReleasedClientIDNotFound identifies a release-client response without the released CID TLV.
+var ErrReleasedClientIDNotFound = errors.New("could not find released client ID in response")
 
 type InternalOpenRequest struct {
 	TransactionID uint16
@@ -85,5 +91,5 @@ func (r *ReleaseClientIDResponse) UnmarshalResponse(TLVs *TLVs) error {
 		r.ClientID = value.Value[1]
 		return nil
 	}
-	return fmt.Errorf("could not find released client ID in response")
+	return ErrReleasedClientIDNotFound
 }
