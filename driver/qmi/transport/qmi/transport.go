@@ -147,9 +147,7 @@ func (t *Transport) Read(c net.Conn, r *protocol.Request) (n int, err error) {
 func responseMatchesRequest(response Response, request *protocol.Request) bool {
 	return response.MessageType == protocol.QMIMessageTypeResponse &&
 		response.ServiceType == request.ServiceType &&
-		response.ClientID == request.ClientID &&
-		response.TransactionID == expectedTransactionID(request) &&
-		response.MessageID == request.MessageID
+		response.TransactionID == expectedTransactionID(request)
 }
 
 func expectedTransactionID(request *protocol.Request) uint16 {
