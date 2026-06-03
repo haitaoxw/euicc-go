@@ -86,11 +86,8 @@ func (t *Transport) Read(c Conn, r *protocol.Request) (n int, err error) {
 		if err := response.UnmarshalBinary(buf[:n]); err != nil {
 			return 0, err
 		}
-		if !response.matches(r) {
+		if response.MessageType != protocol.QMIMessageTypeResponse || response.TransactionID != r.TransactionID {
 			continue
-		}
-		if err := response.Value.Error(); err != nil {
-			return 0, err
 		}
 		if err := r.Response.UnmarshalResponse(&response.Value); err != nil {
 			return 0, err
@@ -98,12 +95,6 @@ func (t *Transport) Read(c Conn, r *protocol.Request) (n int, err error) {
 		return n, nil
 	}
 	return 0, fmt.Errorf("timed out waiting for response for transaction ID %d", r.TransactionID)
-}
-
-func (r *Response) matches(request *protocol.Request) bool {
-	return r.MessageType == protocol.QMIMessageTypeResponse &&
-		r.TransactionID == request.TransactionID &&
-		r.MessageID == request.MessageID
 }
 
 func (t *Transport) Transmit(request *protocol.Request) error {

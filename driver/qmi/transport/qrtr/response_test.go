@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +20,7 @@ func TestResponseRejectsShortHeader(t *testing.T) {
 }
 
 func TestResponseRejectsTLVLengthMismatch(t *testing.T) {
-	packet := encodeResponse(t, 42, protocol.QMIUIMSendAPDU, 0xAA)
+	packet := encodeResponse(t, 42, 0xAA)
 	packet[5]++
 
 	var response Response
@@ -47,12 +46,10 @@ func TestBytesRejectsOversizedMessage(t *testing.T) {
 }
 
 func TestReadSetsRequestDeadline(t *testing.T) {
-	packet := encodeResponse(t, 42, protocol.QMIUIMSendAPDU, 0xAA)
-	conn := &fakeDeadlineConn{packets: [][]byte{packet}}
+	conn := &fakeDeadlineConn{packet: encodeResponse(t, 42, 0xAA)}
 	response := &captureResponse{}
 	request := &protocol.Request{
 		TransactionID: 42,
-		MessageID:     protocol.QMIUIMSendAPDU,
 		Response:      response,
 		ReadTimeout:   25 * time.Millisecond,
 	}
@@ -62,8 +59,8 @@ func TestReadSetsRequestDeadline(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}
-	if n != len(packet) {
-		t.Fatalf("Read length = %d, want %d", n, len(packet))
+	if n != len(conn.packet) {
+		t.Fatalf("Read length = %d, want %d", n, len(conn.packet))
 	}
 	if len(conn.deadlines) != 2 {
 		t.Fatalf("SetReadDeadline calls = %d, want 2", len(conn.deadlines))
@@ -82,52 +79,8 @@ func TestReadSetsRequestDeadline(t *testing.T) {
 	}
 }
 
-func TestReadSkipsIndicationWithoutResultTLV(t *testing.T) {
-	conn := &fakeDeadlineConn{packets: [][]byte{
-		encodeMessage(t, 1, 0x0043, protocol.QMIMessageTypeIndication, protocol.TLVs{
-			{Type: 0x13, Len: 4, Value: []byte{0x01, 0x00, 0x00, 0x00}},
-			{Type: 0x01, Len: 1, Value: []byte{0x01}},
-			{Type: 0x11, Len: 1, Value: []byte{0x02}},
-		}),
-		encodeMessage(t, 5, protocol.QMIUIMCloseLogicalChannel, protocol.QMIMessageTypeResponse, resultTLVs()),
-	}}
-	request := &protocol.Request{
-		TransactionID: 5,
-		MessageID:     protocol.QMIUIMCloseLogicalChannel,
-		Response:      noopResponse{},
-		ReadTimeout:   25 * time.Millisecond,
-	}
-
-	transport := &Transport{}
-	if _, err := transport.Read(conn, request); err != nil {
-		t.Fatalf("Read failed: %v", err)
-	}
-}
-
-func TestReadSkipsMismatchedMessageID(t *testing.T) {
-	conn := &fakeDeadlineConn{packets: [][]byte{
-		encodeResponse(t, 42, protocol.QMIUIMCloseLogicalChannel, 0xAA),
-		encodeResponse(t, 42, protocol.QMIUIMSendAPDU, 0xBB),
-	}}
-	response := &captureResponse{}
-	request := &protocol.Request{
-		TransactionID: 42,
-		MessageID:     protocol.QMIUIMSendAPDU,
-		Response:      response,
-		ReadTimeout:   25 * time.Millisecond,
-	}
-
-	transport := &Transport{}
-	if _, err := transport.Read(conn, request); err != nil {
-		t.Fatalf("Read failed: %v", err)
-	}
-	if got, want := response.payload, []byte{0xBB}; !bytes.Equal(got, want) {
-		t.Fatalf("payload = %X, want %X", got, want)
-	}
-}
-
 type fakeDeadlineConn struct {
-	packets   [][]byte
+	packet    []byte
 	deadline  time.Time
 	deadlines []time.Time
 }
@@ -136,12 +89,7 @@ func (c *fakeDeadlineConn) Read(b []byte) (int, error) {
 	if c.deadline.IsZero() {
 		return 0, errors.New("missing read deadline")
 	}
-	if len(c.packets) == 0 {
-		return 0, os.ErrDeadlineExceeded
-	}
-	packet := c.packets[0]
-	c.packets = c.packets[1:]
-	return copy(b, packet), nil
+	return copy(b, c.packet), nil
 }
 
 func (c *fakeDeadlineConn) Write(p []byte) (int, error) {
@@ -167,32 +115,22 @@ func (r *captureResponse) UnmarshalResponse(tlvs *protocol.TLVs) error {
 	return nil
 }
 
-type noopResponse struct{}
-
-func (r noopResponse) UnmarshalResponse(*protocol.TLVs) error {
-	return nil
-}
-
-func encodeResponse(t *testing.T, txnID uint16, messageID protocol.MessageID, payload byte) []byte {
-	return encodeMessage(t, txnID, messageID, protocol.QMIMessageTypeResponse, append(resultTLVs(), protocol.TLV{Type: 0x10, Len: 1, Value: []byte{payload}}))
-}
-
-func resultTLVs() protocol.TLVs {
-	return protocol.TLVs{{Type: 0x02, Len: 4, Value: []byte{0x00, 0x00, 0x00, 0x00}}}
-}
-
-func encodeMessage(t *testing.T, txnID uint16, messageID protocol.MessageID, messageType protocol.MessageType, tlvs protocol.TLVs) []byte {
+func encodeResponse(t *testing.T, txnID uint16, payload byte) []byte {
 	t.Helper()
 
 	value := new(bytes.Buffer)
+	tlvs := protocol.TLVs{
+		{Type: 0x02, Len: 4, Value: []byte{0x00, 0x00, 0x00, 0x00}},
+		{Type: 0x10, Len: 1, Value: []byte{payload}},
+	}
 	if _, err := tlvs.WriteTo(value); err != nil {
 		t.Fatalf("write TLVs: %v", err)
 	}
 
 	packet := new(bytes.Buffer)
-	mustWrite(t, packet, messageType)
+	mustWrite(t, packet, protocol.QMIMessageTypeResponse)
 	mustWrite(t, packet, txnID)
-	mustWrite(t, packet, messageID)
+	mustWrite(t, packet, protocol.QMIUIMSendAPDU)
 	mustWrite(t, packet, uint16(value.Len()))
 	if _, err := packet.Write(value.Bytes()); err != nil {
 		t.Fatalf("write packet payload: %v", err)
