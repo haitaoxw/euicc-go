@@ -22,16 +22,6 @@ func (f *fakeTransport) Transmit(*protocol.Request) error {
 	return f.err
 }
 
-type fakeCleanupTransport struct {
-	fakeTransport
-	cleanupCalled bool
-}
-
-func (f *fakeCleanupTransport) TransmitCleanup(*protocol.Request) error {
-	f.cleanupCalled = true
-	return f.err
-}
-
 type fakeConn struct {
 	closed   bool
 	closeErr error
@@ -71,28 +61,6 @@ func TestDisconnectClosesConnectionWhenReleaseFails(t *testing.T) {
 	}
 	if !errors.Is(err, closeErr) {
 		t.Fatalf("disconnect error %v does not include close error", err)
-	}
-}
-
-func TestDisconnectUsesCleanupTransportForRelease(t *testing.T) {
-	transport := &fakeCleanupTransport{}
-	conn := &fakeConn{}
-	q := &QMI{
-		conn: conn,
-		Client: uim.Client{
-			Transport: transport,
-			ClientID:  7,
-		},
-	}
-
-	if err := q.Disconnect(); err != nil {
-		t.Fatalf("Disconnect failed: %v", err)
-	}
-	if !transport.cleanupCalled {
-		t.Fatal("TransmitCleanup was not called")
-	}
-	if transport.called {
-		t.Fatal("Transmit should not be called when cleanup transport is available")
 	}
 }
 

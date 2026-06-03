@@ -19,8 +19,3 @@ type ResponseUnmarshaler interface {
 type Transport interface {
 	Transmit(request *Request) error
 }
-
-// CleanupTransport can retry cleanup reads after qmi-proxy delivers stale close packets.
-type CleanupTransport interface {
-	TransmitCleanup(request *Request) error
-}

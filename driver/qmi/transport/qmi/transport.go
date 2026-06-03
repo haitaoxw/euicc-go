@@ -31,11 +31,6 @@ type Transport struct {
 	conn net.Conn
 }
 
-const (
-	cleanupExtraReadLimit = 3
-	cleanupReadTimeout    = time.Second
-)
-
 func New(conn net.Conn) protocol.Transport {
 	return &Transport{conn: conn}
 }
@@ -156,49 +151,6 @@ func (t *Transport) Transmit(request *protocol.Request) error {
 	}
 	_, err = t.Read(t.conn, request)
 	return err
-}
-
-// TransmitCleanup preserves normal qmi-proxy reads, but drains stale close packets before failing cleanup.
-func (t *Transport) TransmitCleanup(request *protocol.Request) error {
-	bs, err := t.bytes(request)
-	if err != nil {
-		return err
-	}
-	if err := writeFull(t.conn, bs); err != nil {
-		return err
-	}
-	_, err = t.Read(t.conn, request)
-	if !isCleanupStrayResponseError(err) {
-		return err
-	}
-	return t.readCleanupResponse(request, err)
-}
-
-func (t *Transport) readCleanupResponse(request *protocol.Request, firstErr error) error {
-	errs := []error{firstErr}
-	readTimeout := request.ReadTimeout
-	if readTimeout == 0 || readTimeout > cleanupReadTimeout {
-		request.ReadTimeout = cleanupReadTimeout
-	}
-	defer func() {
-		request.ReadTimeout = readTimeout
-	}()
-
-	for range cleanupExtraReadLimit {
-		_, err := t.Read(t.conn, request)
-		if err == nil {
-			return nil
-		}
-		errs = append(errs, err)
-		if !isCleanupStrayResponseError(err) {
-			return errors.Join(errs...)
-		}
-	}
-	return errors.Join(errs...)
-}
-
-func isCleanupStrayResponseError(err error) bool {
-	return errors.Is(err, protocol.ErrNoResultTLV) || errors.Is(err, protocol.ErrReleasedClientIDNotFound)
 }
 
 func writeFull(w io.Writer, p []byte) error {
