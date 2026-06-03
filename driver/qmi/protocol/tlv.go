@@ -51,7 +51,7 @@ func (ts *TLVs) ReadFrom(r io.Reader) (int64, error) {
 		}
 		*ts = append(*ts, TLV{Type: t, Len: n, Value: v})
 	}
-	return read, ts.Error()
+	return read, nil
 }
 
 func (ts TLVs) WriteTo(w io.Writer) (int64, error) {

@@ -9,7 +9,7 @@ import (
 )
 
 func TestResponseRejectsQMUXLengthMismatch(t *testing.T) {
-	packet := encodeResponse(t, protocol.QMIServiceUIM, 7, 42, 0xAA)
+	packet := encodeResponse(t, protocol.QMIServiceUIM, 7, 42, protocol.QMIUIMSendAPDU, 0xAA)
 	packet[1]--
 
 	var response Response
@@ -20,7 +20,7 @@ func TestResponseRejectsQMUXLengthMismatch(t *testing.T) {
 }
 
 func TestResponseRejectsTLVLengthMismatch(t *testing.T) {
-	packet := encodeResponse(t, protocol.QMIServiceUIM, 7, 42, 0xAA)
+	packet := encodeResponse(t, protocol.QMIServiceUIM, 7, 42, protocol.QMIUIMSendAPDU, 0xAA)
 	packet[11]++
 
 	var response Response
