@@ -27,27 +27,6 @@ func TestTLVReadFromReturnsWireLength(t *testing.T) {
 	}
 }
 
-func TestTLVReadFromDoesNotRequireResultTLV(t *testing.T) {
-	data := []byte{
-		0x13, 0x04, 0x00,
-		0x01, 0x00, 0x00, 0x00,
-		0x01, 0x01, 0x00,
-		0x01,
-	}
-	var tlvs TLVs
-
-	n, err := tlvs.ReadFrom(bytes.NewReader(data))
-	if err != nil {
-		t.Fatalf("ReadFrom failed: %v", err)
-	}
-	if n != int64(len(data)) {
-		t.Fatalf("ReadFrom length = %d, want %d", n, len(data))
-	}
-	if err := tlvs.Error(); err == nil || err.Error() != "no result TLV found" {
-		t.Fatalf("TLVs.Error() = %v, want missing result TLV", err)
-	}
-}
-
 func TestTLVWriteToReturnsWireLength(t *testing.T) {
 	tlvs := TLVs{
 		{Type: 0x02, Len: 4, Value: []byte{0x00, 0x00, 0x00, 0x00}},

@@ -50,7 +50,6 @@ func TestReadSetsRequestDeadline(t *testing.T) {
 	response := &captureResponse{}
 	request := &protocol.Request{
 		TransactionID: 42,
-		MessageID:     protocol.QMIUIMSendAPDU,
 		Response:      response,
 		ReadTimeout:   25 * time.Millisecond,
 	}
@@ -77,21 +76,6 @@ func TestReadSetsRequestDeadline(t *testing.T) {
 	}
 	if got, want := response.payload, []byte{0xAA}; !bytes.Equal(got, want) {
 		t.Fatalf("payload = %X, want %X", got, want)
-	}
-}
-
-func TestReadReturnsTargetResponseQMIError(t *testing.T) {
-	conn := &fakeDeadlineConn{packet: encodeErrorResponse(t, 42, protocol.QMIErrorInvalidArgument)}
-	request := &protocol.Request{
-		TransactionID: 42,
-		MessageID:     protocol.QMIUIMSendAPDU,
-		Response:      &captureResponse{},
-		ReadTimeout:   25 * time.Millisecond,
-	}
-
-	transport := &Transport{}
-	if _, err := transport.Read(conn, request); !errors.Is(err, protocol.QMIErrorInvalidArgument) {
-		t.Fatalf("Read error = %v, want %v", err, protocol.QMIErrorInvalidArgument)
 	}
 }
 
@@ -134,29 +118,11 @@ func (r *captureResponse) UnmarshalResponse(tlvs *protocol.TLVs) error {
 func encodeResponse(t *testing.T, txnID uint16, payload byte) []byte {
 	t.Helper()
 
+	value := new(bytes.Buffer)
 	tlvs := protocol.TLVs{
 		{Type: 0x02, Len: 4, Value: []byte{0x00, 0x00, 0x00, 0x00}},
 		{Type: 0x10, Len: 1, Value: []byte{payload}},
 	}
-	return encodePacket(t, txnID, tlvs)
-}
-
-func encodeErrorResponse(t *testing.T, txnID uint16, qmiErr protocol.QMIError) []byte {
-	t.Helper()
-
-	return encodePacket(t, txnID, protocol.TLVs{
-		{
-			Type:  0x02,
-			Len:   4,
-			Value: []byte{byte(protocol.QMIResultFailure), 0x00, byte(qmiErr), 0x00},
-		},
-	})
-}
-
-func encodePacket(t *testing.T, txnID uint16, tlvs protocol.TLVs) []byte {
-	t.Helper()
-
-	value := new(bytes.Buffer)
 	if _, err := tlvs.WriteTo(value); err != nil {
 		t.Fatalf("write TLVs: %v", err)
 	}

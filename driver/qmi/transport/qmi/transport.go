@@ -130,11 +130,8 @@ func (t *Transport) Read(c net.Conn, r *protocol.Request) (n int, err error) {
 		if err := response.UnmarshalBinary(buf[:length]); err != nil {
 			return 0, err
 		}
-		if !responseMatchesRequest(response, r) {
+		if response.MessageType != protocol.QMIMessageTypeResponse && r.ClientID != response.ClientID && response.TransactionID != r.TransactionID {
 			continue
-		}
-		if err := response.Value.Error(); err != nil {
-			return 0, err
 		}
 		if err := r.Response.UnmarshalResponse(&response.Value); err != nil {
 			return 0, err
@@ -142,21 +139,6 @@ func (t *Transport) Read(c net.Conn, r *protocol.Request) (n int, err error) {
 		return length, nil
 	}
 	return 0, fmt.Errorf("timed out waiting for response for transaction ID %d", r.TransactionID)
-}
-
-func responseMatchesRequest(response Response, request *protocol.Request) bool {
-	return response.MessageType == protocol.QMIMessageTypeResponse &&
-		response.ServiceType == request.ServiceType &&
-		response.ClientID == request.ClientID &&
-		response.TransactionID == expectedTransactionID(request) &&
-		response.MessageID == request.MessageID
-}
-
-func expectedTransactionID(request *protocol.Request) uint16 {
-	if request.ServiceType == protocol.QMIServiceControl {
-		return uint16(uint8(request.TransactionID))
-	}
-	return request.TransactionID
 }
 
 func (t *Transport) Transmit(request *protocol.Request) error {
